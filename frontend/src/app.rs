@@ -3,6 +3,7 @@ use leptos::web_sys;
 use types::Todo;
 
 use crate::api;
+use crate::components::todo_item::TodoItem;
 
 #[component]
 pub fn TodoApp() -> impl IntoView {
@@ -50,11 +51,7 @@ pub fn TodoApp() -> impl IntoView {
                         key=|todo| todo.id
                         children=move |todo: Todo| {
                             view! {
-                                <li class:completed=todo.completed>
-                                    <div class="view">
-                                        <label>{todo.title.clone()}</label>
-                                    </div>
-                                </li>
+                                <TodoItem todo=todo todos=todos />
                             }
                         }
                     />
