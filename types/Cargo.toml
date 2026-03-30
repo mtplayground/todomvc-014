@@ -1,0 +1,17 @@
+[package]
+name = "types"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+
+[features]
+default = []
+backend = ["sqlx"]
+
+[dependencies.sqlx]
+version = "0.8"
+optional = true
+default-features = false
+features = ["sqlite"]
