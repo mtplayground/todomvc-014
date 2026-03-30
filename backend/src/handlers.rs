@@ -104,6 +104,41 @@ pub async fn delete_todo(
     Ok(StatusCode::NO_CONTENT)
 }
 
+pub async fn toggle_all(State(pool): State<AppState>) -> Result<Json<Vec<Todo>>, AppError> {
+    // If any todo is not completed, mark all as completed; otherwise mark all as not completed
+    let all_completed = sqlx::query_scalar::<_, bool>(
+        "SELECT COALESCE(MIN(completed), 1) FROM todos",
+    )
+    .fetch_one(&pool)
+    .await?;
+
+    let new_status = !all_completed;
+    sqlx::query("UPDATE todos SET completed = ?")
+        .bind(new_status)
+        .execute(&pool)
+        .await?;
+
+    let todos = sqlx::query_as::<_, Todo>(
+        r#"SELECT id, title, completed, "order" FROM todos ORDER BY "order", id"#,
+    )
+    .fetch_all(&pool)
+    .await?;
+    Ok(Json(todos))
+}
+
+pub async fn clear_completed(State(pool): State<AppState>) -> Result<Json<Vec<Todo>>, AppError> {
+    sqlx::query("DELETE FROM todos WHERE completed = 1")
+        .execute(&pool)
+        .await?;
+
+    let todos = sqlx::query_as::<_, Todo>(
+        r#"SELECT id, title, completed, "order" FROM todos ORDER BY "order", id"#,
+    )
+    .fetch_all(&pool)
+    .await?;
+    Ok(Json(todos))
+}
+
 // Error handling
 
 pub enum AppError {
