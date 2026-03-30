@@ -1,0 +1,92 @@
+# TodoMVC Architecture Plan
+
+## Stack
+- **Backend**: Rust, Axum 0.8, SQLite via sqlx, tower-http (CORS + static files)
+- **Frontend**: Rust/WASM, Leptos 0.8, gloo-net for HTTP, Trunk for build
+- **Shared**: `types` crate for Todo struct used by both sides
+
+## Workspace Layout
+```
+Cargo.toml              # workspace root: members = [backend, frontend, types]
+types/
+  Cargo.toml
+  src/lib.rs            # Todo, CreateTodo, UpdateTodo structs (serde)
+backend/
+  Cargo.toml
+  migrations/
+    YYYYMMDD_create_todos.sql
+  src/
+    main.rs             # server startup, router assembly, CORS, static files
+    db.rs               # SQLite pool init, embedded migrations
+    routes.rs           # Axum router definition
+    handlers.rs         # handler functions for all endpoints
+  tests/
+    api_tests.rs        # integration tests
+frontend/
+  Cargo.toml
+  Trunk.toml            # proxy /api to backend
+  index.html            # WASM entry point + TodoMVC CSS
+  style.css             # TodoMVC stylesheet
+  src/
+    main.rs             # Leptos mount
+    app.rs              # TodoApp root component, toggle-all
+    api.rs              # HTTP client (gloo-net)
+    components/
+      mod.rs
+      todo_item.rs      # display, toggle, delete, inline edit
+      todo_footer.rs    # count, filters, clear completed
+```
+
+## Shared Types (types crate)
+```rust
+struct Todo { id: i64, title: String, completed: bool, order: i64 }
+struct CreateTodo { title: String }
+struct UpdateTodo { title: Option<String>, completed: Option<bool>, order: Option<i64> }
+```
+
+## API Endpoints
+| Method | Path                     | Purpose              |
+|--------|--------------------------|----------------------|
+| GET    | /api/todos               | List all             |
+| POST   | /api/todos               | Create               |
+| GET    | /api/todos/:id           | Get one              |
+| PATCH  | /api/todos/:id           | Update one           |
+| DELETE | /api/todos/:id           | Delete one           |
+| PATCH  | /api/todos               | Toggle all           |
+| DELETE | /api/todos/completed     | Clear completed      |
+
+## Database Schema
+```sql
+CREATE TABLE todos (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  title TEXT NOT NULL,
+  completed BOOLEAN NOT NULL DEFAULT 0,
+  "order" INTEGER NOT NULL DEFAULT 0
+);
+```
+
+## Issue Dependency Graph
+```
+Issue 1 (workspace init)
+  ├── Issue 2 (SQLite + migrations)
+  │     ├── Issue 4 (CRUD endpoints)
+  │     │     ├── Issue 5 (bulk ops)
+  │     │     └── Issue 6 (CORS + static)
+  │     └── Issue 13 (integration tests) [depends on 4+5]
+  ├── Issue 3 (Trunk + frontend entry)
+  │     ├── Issue 7 (API client) [also needs types from 1]
+  │     │     ├── Issue 8 (TodoApp root)
+  │     │     │     ├── Issue 9 (TodoItem)
+  │     │     │     │     └── Issue 10 (inline edit)
+  │     │     │     ├── Issue 11 (TodoFooter)
+  │     │     │     └── Issue 12 (toggle-all)
+  └── Issue 14 (README) [last]
+```
+
+## Key Design Decisions
+1. **Shared types crate** avoids duplicating Todo struct between backend/frontend
+2. **SQLite** — lightweight, no external DB needed; sqlx compile-time checked queries
+3. **Trunk proxy** — frontend dev server proxies /api to backend, avoiding CORS in dev
+4. **Client-side filtering** — All/Active/Completed filters use URL hash, no server round-trip
+5. **Leptos signals** — single `Vec<Todo>` signal in TodoApp, passed to children
+6. **gloo-net** for WASM-compatible HTTP client (reqwest WASM target also viable)
