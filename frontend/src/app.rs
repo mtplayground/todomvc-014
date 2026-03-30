@@ -51,6 +51,18 @@ pub fn TodoApp() -> impl IntoView {
     };
 
     let has_todos = move || !todos.get().is_empty();
+    let all_completed = move || {
+        let t = todos.get();
+        !t.is_empty() && t.iter().all(|todo| todo.completed)
+    };
+
+    let on_toggle_all = move |_| {
+        leptos::task::spawn_local(async move {
+            if let Ok(updated) = api::toggle_all().await {
+                todos.set(updated);
+            }
+        });
+    };
 
     let add_todo = move |ev: web_sys::KeyboardEvent| {
         if ev.key() == "Enter" {
@@ -83,6 +95,14 @@ pub fn TodoApp() -> impl IntoView {
                 if has_todos() {
                     Some(view! {
                         <section class="main">
+                            <input
+                                id="toggle-all"
+                                class="toggle-all"
+                                type="checkbox"
+                                prop:checked=all_completed
+                                on:change=on_toggle_all
+                            />
+                            <label for="toggle-all">"Mark all as complete"</label>
                             <ul class="todo-list">
                                 <For
                                     each=filtered_todos
